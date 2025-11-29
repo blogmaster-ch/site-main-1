@@ -1,46 +1,53 @@
-// ads-loader.js
+// ads-loader.js  完全版
+
 (async () => {
-  // ★ここをあなたのシートIDにする
-  //   URLが https://docs.google.com/spreadsheets/d/XXXXX/edit...
-  //   の「XXXXX」の部分だけに置き換える
-  const SHEET_ID = "10z11NTxO47UlxVWFHoIlM_Zm2pIwgRvI1HxbHapKxvk"; // 例
+  // ここのIDは「今あなたのコードに入っているシートID」をそのまま使ってください
+  const SHEET_ID = '10z11NTxO47UlxVWFHoIlM_Zm2pIwgRvI1HxbHapKxvk';
+  const SHEET_NAME = 'aff_list';
 
-  const SHEET_NAME = "aff_list";
-
-  const url =
-    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(SHEET_NAME)}`;
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${SHEET_NAME}`;
 
   try {
+    console.log('loadAds: fetch', url);
     const res = await fetch(url);
     const text = await res.text();
 
-    // gviz形式なので先頭と末尾を削る
-    const json = JSON.parse(text.substring(47, text.length - 2));
-
+    // gviz の余分な文字を削って JSON にする
+    const json = JSON.parse(text.substr(47).slice(0, -2));
     const rows = json.table.rows || [];
+
+    // スロット名 → 広告URL のマップを作る
     const slots = {};
+    rows.forEach(r => {
+      const slotName = r.c[0]?.v;  // A列: slot_name
+      const adUrl    = r.c[3]?.v;  // D列: active_tag(=広告URL)
+      const status   = r.c[4]?.v;  // E列: status
 
-    rows.forEach((r) => {
-      const slotName = r.c[0]?.v; // A列: slot_name
-      const tag      = r.c[3]?.v; // D列: active_tag
-      const status   = r.c[4]?.v; // E列: status
-
-      if (!slotName || !tag) return;
-      if (status && String(status).toLowerCase() !== "active") return;
-
-      slots[slotName] = tag;
-    });
-
-    // デバッグ用（必要ならF12 → Consoleで確認できる）
-    console.log("loaded ad slots:", slots);
-
-    document.querySelectorAll("[data-ad-slot]").forEach((el) => {
-      const name = el.getAttribute("data-ad-slot");
-      if (name && slots[name]) {
-        el.innerHTML = slots[name];
+      if (slotName && adUrl && status === 'active') {
+        slots[slotName] = adUrl;
       }
     });
+
+    console.log('loadAds: slots', slots);
+
+    // ページ内の data-ad-slot を全部差し込む
+    document.querySelectorAll('[data-ad-slot]').forEach(el => {
+      const slot = el.getAttribute('data-ad-slot');
+      const adUrl = slots[slot];
+
+      if (!adUrl) {
+        console.warn('loadAds: no ad url for slot', slot);
+        return;
+      }
+
+      // <script src="..."> を動的に作る（innerHTMLは使わない）
+      const s = document.createElement('script');
+      s.src = adUrl;
+      s.async = true;
+      el.appendChild(s);
+    });
+
   } catch (e) {
-    console.error("ads-loader error", e);
+    console.error('loadAds error', e);
   }
 })();
