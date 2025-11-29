@@ -1,62 +1,53 @@
-// ads-loader.js
+// ads-loader.js  全部これに差し替え
 
-async function loadAds() {
-  // ★ ここはあなたが直したスプレッドシートIDのままでOK
-  const sheetId = "10z11NTxO47UlxVWFHoIlM_Zm2pIwgRvI1HxbHapKxvk"; 
-  const sheetName = "aff_list";
+(async () => {
+  // ★ここをあなたのスプシIDに変える
+  // URL が https://docs.google.com/spreadsheets/d/XXXX/edit?... のとき、この XXXX の部分
+  const SHEET_ID = '10z11NTxO47UlxVWFHoIlM_Zm2pIwgRvI1HxbHapKxvk';
 
-  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${sheetName}`;
+  const SHEET_NAME = 'aff_list';
+
+  const url =
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}` +
+    `/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(SHEET_NAME)}`;
 
   try {
     const res = await fetch(url);
     const text = await res.text();
 
-    // GoogleスプシのJSON前後のゴミを削る
+    // gviz 形式のJSONから本体だけ抜き出す
     const json = JSON.parse(text.substring(47, text.length - 2));
-    const rows = json.table.rows;
+    const rows = json.table.rows || [];
 
-    // スロット名 → 忍者の src URL のマップ
-    const slotToSrc = {};
+    // スロット名 → script src のマップを作る
+    const slotMap = {};
+    rows.forEach((r) => {
+      const slotName = r.c[0]?.v;   // A列：slot_name
+      const type = r.c[1]?.v;       // B列：type
+      const genre = r.c[2]?.v;      // C列：genre（今は使ってない）
+      const scriptSrc = r.c[3]?.v;  // D列：script_src
+      const status = r.c[4]?.v;     // E列：status
 
-    rows.forEach((row) => {
-      if (!row.c) return;
+      if (!slotName || !scriptSrc) return;
+      if (status !== 'active') return;
 
-      const slot   = row.c[0] && row.c[0].v;  // スロット名（DSP_TOPなど）
-      const tagRaw = row.c[3] && row.c[3].v;  // 有効タグ（忍者タグ全文）
-      const status = row.c[4] && row.c[4].v;  // 状態（ACTIVEなど）
-
-      if (!slot || !tagRaw) return;
-      if (status && status !== "ACTIVE") return;
-
-      // 有効タグの中から src="..." を抜き出す
-      let src = tagRaw;
-      const m = tagRaw.match(/src=["']([^"']+)["']/i);
-      if (m) {
-        src = m[1];
-      }
-
-      slotToSrc[slot] = src;
+      slotMap[slotName] = scriptSrc;
     });
 
-    // data-ad-slot="DSP_TOP" などの場所に <script src="..."> を挿入
-    document.querySelectorAll("[data-ad-slot]").forEach((el) => {
-      const slotName = el.getAttribute("data-ad-slot");
-      const src = slotToSrc[slotName];
+    // data-ad-slot を持つ要素にスクリプトを差し込む
+    document.querySelectorAll('[data-ad-slot]').forEach((el) => {
+      const slot = el.getAttribute('data-ad-slot');
+      const src = slotMap[slot];
       if (!src) return;
 
-      // いったん中身を空にしてからscript要素を追加
-      el.innerHTML = "";
-      const s = document.createElement("script");
+      // 既存の中身を消してから <script> を生成
+      el.innerHTML = '';
+      const s = document.createElement('script');
       s.src = src;
       s.async = true;
       el.appendChild(s);
     });
-
   } catch (e) {
-    console.error("loadAds error", e);
+    console.error('ads-loader error', e);
   }
-}
-
-// ページのDOM読み込みが終わったら実行
-document.addEventListener("DOMContentLoaded", loadAds);
-
+})();
