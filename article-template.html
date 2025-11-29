@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{title}}</title>
+</head>
+<body>
+
+    <!-- 記事タイトル -->
+    <h1>{{title}}</h1>
+
+    <!-- 記事公開日 -->
+    <p style="color:#666;font-size:12px;">{{date}}</p>
+
+    <!-- 上部広告 -->
+    <div data-ad-slot="DSP_TOP"></div>
+
+    <!-- 記事本文（AIが生成） -->
+    <div id="content">
+        {{content}}
+    </div>
+
+    <!-- 中段広告 -->
+    <div data-ad-slot="DSP_MID"></div>
+
+    <!-- 記事下部（まとめなど） -->
+    <div id="footerContent">
+        {{footer}}
+    </div>
+
+    <!-- 下部広告 -->
+    <div data-ad-slot="DSP_BOTTOM"></div>
+
+    <!-- 広告ローダー -->
+    <script src="/ads-loader.js"></script>
+
+</body>
+</html>
