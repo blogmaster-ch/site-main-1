@@ -1,48 +1,62 @@
-// ads-loader.js  （全部これだけにする）
+// ads-loader.js
 
-(async () => {
-  // ★このIDはあなたのスプレッドシートID（スクショのやつ）
-  const sheetId = "10z11NTxO47UlxVWFHoIlM_Zm2pIwgRvI1HxbHapKxvk";
+async function loadAds() {
+  // ★ ここはあなたが直したスプレッドシートIDのままでOK
+  const sheetId = "10z11NTxO47UlxVWFHoIlM_Zm2pIwgRvI1HxbHapKxvk"; 
   const sheetName = "aff_list";
 
-  const url =
-    "https://docs.google.com/spreadsheets/d/" +
-    sheetId +
-    "/gviz/tq?tqx=out:json&sheet=" +
-    encodeURIComponent(sheetName);
+  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${sheetName}`;
 
   try {
     const res = await fetch(url);
     const text = await res.text();
 
-    // gviz のラッパーを剥がして JSON 部分だけ取り出す
-    const jsonText = text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1);
-    const data = JSON.parse(jsonText);
+    // GoogleスプシのJSON前後のゴミを削る
+    const json = JSON.parse(text.substring(47, text.length - 2));
+    const rows = json.table.rows;
 
-    const rows = data.table.rows || [];
+    // スロット名 → 忍者の src URL のマップ
+    const slotToSrc = {};
 
-    // slot_name → active_tag のマップを作る
-    const slotMap = {};
-    rows.forEach((r) => {
-      const slot = r.c[0] && r.c[0].v; // A列 slot_name
-      const tag = r.c[3] && r.c[3].v;  // D列 active_tag
-      const status = r.c[4] && r.c[4].v; // E列 status
+    rows.forEach((row) => {
+      if (!row.c) return;
 
-      if (!slot || !tag) return;
-      if (status !== "active") return;
+      const slot   = row.c[0] && row.c[0].v;  // スロット名（DSP_TOPなど）
+      const tagRaw = row.c[3] && row.c[3].v;  // 有効タグ（忍者タグ全文）
+      const status = row.c[4] && row.c[4].v;  // 状態（ACTIVEなど）
 
-      slotMap[slot] = tag;
+      if (!slot || !tagRaw) return;
+      if (status && status !== "ACTIVE") return;
+
+      // 有効タグの中から src="..." を抜き出す
+      let src = tagRaw;
+      const m = tagRaw.match(/src=["']([^"']+)["']/i);
+      if (m) {
+        src = m[1];
+      }
+
+      slotToSrc[slot] = src;
     });
 
-    // data-ad-slot に対応するタグを流し込む
+    // data-ad-slot="DSP_TOP" などの場所に <script src="..."> を挿入
     document.querySelectorAll("[data-ad-slot]").forEach((el) => {
       const slotName = el.getAttribute("data-ad-slot");
-      const tag = slotMap[slotName];
-      if (!tag) return;
-      el.innerHTML = tag;
+      const src = slotToSrc[slotName];
+      if (!src) return;
+
+      // いったん中身を空にしてからscript要素を追加
+      el.innerHTML = "";
+      const s = document.createElement("script");
+      s.src = src;
+      s.async = true;
+      el.appendChild(s);
     });
+
   } catch (e) {
-    console.error("ads-loader.js error:", e);
+    console.error("loadAds error", e);
   }
-})();
+}
+
+// ページのDOM読み込みが終わったら実行
+document.addEventListener("DOMContentLoaded", loadAds);
 
